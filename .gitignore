@@ -20,3 +20,14 @@ metric.P
 # system files
 Thumbs.db
 .DS_Store
+
+# python
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.venv/
+venv/
+build/
+dist/
+*.egg-info/

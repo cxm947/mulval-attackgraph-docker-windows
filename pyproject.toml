@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mulval-pylogic"
+version = "0.1.0"
+description = "Pure Python MulVAL-like logic engine for attack graph generation with csv/txt/pdf outputs."
+readme = "README.md"
+requires-python = ">=3.9"
+authors = [
+  { name = "cxm947" }
+]
+keywords = ["mulval", "attack-graph", "docker", "security", "windows"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: Microsoft :: Windows",
+  "Topic :: Security",
+  "Topic :: Software Development :: Libraries :: Python Modules"
+]
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/cxm947/mulval-attackgraph-docker-windows"
+
+[project.scripts]
+mulval-logic = "mulval_pylogic.cli:main"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["mulval_pylogic*"]
