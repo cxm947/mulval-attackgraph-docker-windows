@@ -1,47 +1,44 @@
-# mulval-pylogic
+# MulVAL Attack Graph (Docker + Python)
 
-将 MulVAL 风格的规则推理逻辑改写为 Python 库，输入仍使用 `.P` 文件，输出包含：
+这个仓库包含两部分：
+
+1. Docker 运行方式（原始 MulVAL 流程，配合 `mulval-docker.bat`）
+2. 纯 Python 推理库（已单独放到 `python-lib/`）
+
+## 目录结构
+
+- `docker-compose.yml`：MulVAL 容器编排
+- `mulval-docker.bat`：Windows 一键驱动脚本
+- `S2.P`、`rules5.P`：示例输入与规则文件
+- `python-lib/`：独立 Python 项目（`src` 布局）
+
+## Docker 用法（Windows）
+
+1. 安装并启动 Docker Desktop
+2. 在仓库根目录运行 `mulval-docker.bat`
+3. 在脚本里可配置输入和规则文件名
+
+## Python 用法
+
+Python 项目说明见：
+
+- [`python-lib/README.md`](python-lib/README.md)
+
+快速开始：
+
+```powershell
+cd python-lib
+pip install -e .
+mulval-logic --input ..\S2.P --rules ..\rules5.P --output-dir ..\pylogic_out
+```
+
+## 输出文件
+
+无论 Docker 还是 Python，都会生成以下核心文件：
 
 - `VERTICES.CSV`
 - `ARCS.CSV`
 - `AttackGraph.txt`
 - `AttackGraph.pdf`
 
-## 安装
-
-```bash
-pip install -e .
-```
-
-## 命令行使用
-
-```bash
-mulval-logic --input F:\mulval-docker\S2.P --rules F:\mulval-docker\rules5.P --output-dir F:\mulval-docker
-```
-
-## Python API 使用
-
-```python
-from pathlib import Path
-from mulval_pylogic import LogicConfig, run_logic
-
-result = run_logic(
-    LogicConfig(
-        input_file=Path(r"F:\mulval-docker\S2.P"),
-        rules_file=Path(r"F:\mulval-docker\rules5.P"),
-        output_dir=Path(r"F:\mulval-docker"),
-    )
-)
-
-print(result.attackgraph_pdf)
-```
-
-## 输入格式
-
-- 输入 `.P` 文件格式保持不变（如 `S2.P`）
-- 规则 `.P` 文件格式保持不变（如 `rules5.P`）
-
-## 说明
-
-- 该实现是 Python 规则推理引擎，不依赖 MulVAL Docker 推理流程。
-- 生成 PDF 依赖 Graphviz 的 `dot` 命令（请保证已安装并可执行）。
+其中 Python 版本已验证在多组场景下可对齐 Docker 的“节点和边推理结果”。

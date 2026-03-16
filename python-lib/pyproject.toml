@@ -31,5 +31,5 @@ mulval-logic = "mulval_pylogic.cli:main"
 include-package-data = true
 
 [tool.setuptools.packages.find]
-where = ["."]
+where = ["src"]
 include = ["mulval_pylogic*"]

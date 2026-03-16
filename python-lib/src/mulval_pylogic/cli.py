@@ -8,10 +8,10 @@ from .engine import LogicConfig, LogicError, run_logic
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="mulval-logic", description="Pure Python MulVAL-like logic runner")
-    p.add_argument("--input", required=True, help="Input .P file (facts)")
-    p.add_argument("--rules", required=True, help="Rules .P file")
-    p.add_argument("--output-dir", default=".", help="Output directory")
+    p = argparse.ArgumentParser(prog="mulval-logic", description="Single-run MulVAL-like Python logic engine")
+    p.add_argument("--input", required=True, help="Input .P file (e.g. S2.P)")
+    p.add_argument("--rules", required=True, help="Rules .P file (e.g. rules5.P)")
+    p.add_argument("--output-dir", required=True, help="Output directory")
     p.add_argument("--dot-bin", default=None, help="Path to Graphviz dot executable")
     return p
 
@@ -29,6 +29,7 @@ def main(argv: list[str] | None = None) -> int:
     except LogicError as exc:
         print(f"[ERROR] {exc}", file=sys.stderr)
         return 1
+
     print(f"VERTICES.CSV: {r.vertices_csv}")
     print(f"ARCS.CSV: {r.arcs_csv}")
     print(f"AttackGraph.txt: {r.attackgraph_txt}")
