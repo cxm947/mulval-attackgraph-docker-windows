@@ -1,0 +1,86 @@
+/*enclave network II (a medium sized network)*/
+
+attackerLocated(internet). 
+attackGoal(execCode(_,_)).
+% attackGoal(attackVectorInjection(_,_,_,_)).
+% attackGoal(netAccess(_,_,_)).
+
+
+/*Network connections*/
+hacl(internet, webServer, httpd, 80).
+%hacl(webServer, mailServer, nfsProtocol, nfsPort).
+hacl(internet, vpnServer, httpd, 80).
+hacl(internet, citrixServer, httpd, 80).
+hacl(internet, commServer, httpd, 80).
+hacl(vpnServer, citrixServer, httpd, 80).
+% hacl(citrixServer, vpnServer, httpd, 80).
+hacl(commServer, dataHistorian, https, 443).
+hacl(webServer, fileServer, smb, 445).
+hacl(webServer, workStation, tcp, 80).
+hacl(fileServer, workStation, tcp, 80).
+hacl(fileServer, workStation, tcp, 2049).
+hacl(vpnServer, workStation, httpd, 80).
+hacl(webServer, workStation, tcp, 873).
+
+
+
+
+
+/* configuration information of citrixServer */
+inCompetent(victim_1, citrixServer, admin).
+ttpExists(citrixServer, 'CVE-2010-0490', ie, remoteClient, clientVulnerability, execution).
+networkServiceInfo(citrixServer, ie, httpd, 80, admin).
+
+
+/* configuration information of commServer */
+inCompetent(victim_2, commServer, admin).
+ttpExists(commServer, 'CVE-2010-0483', vbScript, remoteClient, abuseofVBScriptorVBA, execution).
+networkServiceInfo(commServer, vbScript, httpd, 80, admin).
+
+
+/* configuration information of vpnServer */
+inCompetent(victim_3, vpnServer, admin).
+ttpExists(vpnServer, 'CVE-2010-0492', ie, remoteClient, clientVulnerability, execution).
+networkServiceInfo(vpnServer, ie, httpd, 80, root).
+
+
+/* configuration information of webServer */
+/* Endpoint Denial of Service: Application or System Exploitation */
+
+% inCompetent(victim_4, webServer, root).
+ttpExists(webServer, iis, remoteClient, disguisedLegitimateDocument, defenseEvasion).
+networkServiceInfo(webServer, iis, httpd, 80, root).
+
+
+/* configuration information of dataHistorian */
+ttpExists(dataHistorian, 'CVE-2010-0494', ie, remoteClient, browserSessionHijacking, collection).
+networkServiceInfo(dataHistorian, ie, https, 443, root).
+
+
+/* configuration information of fileServer */
+ttpExists(fileServer, 'CVE-2010-0812', isatap, remoteClient, networkBoundaryBridging, defenseEvasion).
+networkServiceInfo(fileServer, isatap, smb, 445, root).
+
+
+/* configuration information of workStation */
+weakAccount(workStation, user1, xige1234, admin).
+
+pathExists(workStation, '/ProgramFiles/Symantec/Backup_Exec/bengine.exe', write, admin).
+ttpExists(workStation, backupExecService, local, pathHijack, privilegeEscalation).
+
+networkServiceInfo(workStation, mountd, tcp, 2049, admin).
+ttpExists(workStation, mountd, remoteExploit, linuxRemoteManagement, lateralMovement).
+nfsMount(workStation, '/export', mountd, write, fileServer).
+
+ttpExists(workStation, rsync, remoteClient, remoteServicesExploitation, lateralMovement).
+networkServiceInfo(workStation, rsync, tcp, 873, user).
+
+
+
+
+
+
+
+
+
+

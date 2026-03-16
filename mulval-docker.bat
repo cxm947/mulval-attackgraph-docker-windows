@@ -9,9 +9,9 @@ set "LEGACY_CONFIG_FILE=%SCRIPT_DIR%\mulval.config"
 
 set "DEFAULT_CONTAINER=mulval-attackgraph"
 set "DEFAULT_IMAGE=wilbercui/mulval"
-set "DEFAULT_MOUNT_DIR=%SCRIPT_DIR%"
-set "DEFAULT_INPUT=sample-attack.P"
-set "DEFAULT_RULES="
+set "DEFAULT_MOUNT_DIR=F:\mulval-docker"
+set "DEFAULT_INPUT=S2.P"
+set "DEFAULT_RULES=rules5.P"
 
 set "CONTAINER=%DEFAULT_CONTAINER%"
 set "IMAGE=%DEFAULT_IMAGE%"
@@ -19,9 +19,9 @@ set "MOUNT_DIR=%DEFAULT_MOUNT_DIR%"
 set "INPUT_FILE=%DEFAULT_INPUT%"
 set "RULES_FILE=%DEFAULT_RULES%"
 
-call :load_kv_file "%ENV_FILE%"
-call :load_kv_file "%LEGACY_CONFIG_FILE%"
-call :normalize_mount_dir
+call :loadkv "%ENV_FILE%"
+call :loadkv "%LEGACY_CONFIG_FILE%"
+call :normalizemount
 call :resolve_docker || exit /b 1
 
 if "%~1"=="" (
@@ -31,58 +31,59 @@ if "%~1"=="" (
 )
 
 if /I "%ACTION%"=="help" goto :usage
-if /I "%ACTION%"=="status" (
-  call :check_docker_engine || exit /b 1
-  call :print_status
-  exit /b 0
-)
-
-if /I "%ACTION%"=="up" (
-  call :ensure_container || exit /b 1
-  call :print_status
-  exit /b 0
-)
-
-if /I "%ACTION%"=="recreate" (
-  call :recreate_container || exit /b 1
-  call :print_status
-  exit /b 0
-)
-
-if /I "%ACTION%"=="down" (
-  call :check_docker_engine || exit /b 1
-  call :stop_container
-  exit /b 0
-)
-
-if /I "%ACTION%"=="shell" (
-  call :ensure_container || exit /b 1
-  echo Opening shell in %CONTAINER% ...
-  "%DOCKER%" exec -it "%CONTAINER%" bash
-  exit /b !ERRORLEVEL!
-)
-
-if /I "%ACTION%"=="run" (
-  set "RUN_INPUT=%~2"
-  set "RUN_RULES=%~3"
-  if not defined RUN_INPUT set "RUN_INPUT=%INPUT_FILE%"
-  if not defined RUN_RULES set "RUN_RULES=%RULES_FILE%"
-  call :run_mulval "!RUN_INPUT!" "!RUN_RULES!"
-  exit /b !ERRORLEVEL!
-)
-
-if /I "%ACTION%"=="init-env" (
-  call :init_env
-  exit /b 0
-)
-
-if /I "%ACTION%"=="init-config" (
-  call :init_legacy_config
-  exit /b 0
-)
+if /I "%ACTION%"=="status" goto :action_status
+if /I "%ACTION%"=="up" goto :action_up
+if /I "%ACTION%"=="recreate" goto :action_recreate
+if /I "%ACTION%"=="down" goto :action_down
+if /I "%ACTION%"=="shell" goto :action_shell
+if /I "%ACTION%"=="run" goto :action_run
+if /I "%ACTION%"=="init-env" goto :action_init_env
+if /I "%ACTION%"=="init-config" goto :action_init_config
 
 echo Unknown action: %ACTION%
 goto :usage
+
+:action_status
+call :checkdocker || exit /b 1
+call :printstatus
+exit /b 0
+
+:action_up
+call :recreatecontainer || exit /b 1
+call :printstatus
+exit /b 0
+
+:action_recreate
+call :recreatecontainer || exit /b 1
+call :printstatus
+exit /b 0
+
+:action_down
+call :checkdocker || exit /b 1
+call :stopcontainer
+exit /b 0
+
+:action_shell
+call :ensurecontainer || exit /b 1
+echo Opening shell in %CONTAINER% ...
+"%DOCKER%" exec -it "%CONTAINER%" bash
+exit /b !ERRORLEVEL!
+
+:action_run
+set "RUN_INPUT=%~2"
+set "RUN_RULES=%~3"
+if not defined RUN_INPUT set "RUN_INPUT=%INPUT_FILE%"
+if not defined RUN_RULES set "RUN_RULES=%RULES_FILE%"
+call :runmulval "!RUN_INPUT!" "!RUN_RULES!"
+exit /b !ERRORLEVEL!
+
+:action_init_env
+call :initenv
+exit /b 0
+
+:action_init_config
+call :initlegacyconfig
+exit /b 0
 
 :usage
 echo.
@@ -128,7 +129,7 @@ if not defined DOCKER (
 )
 exit /b 0
 
-:check_docker_engine
+:checkdocker
 "%DOCKER%" info >nul 2>nul
 if errorlevel 1 (
   echo [ERROR] Docker engine is not running. Start Docker Desktop first.
@@ -136,8 +137,12 @@ if errorlevel 1 (
 )
 exit /b 0
 
-:ensure_container
-call :check_docker_engine || exit /b 1
+:ensurecontainer
+"%DOCKER%" info >nul 2>nul
+if errorlevel 1 (
+  echo [ERROR] Docker engine is not running. Start Docker Desktop first.
+  exit /b 1
+)
 
 "%DOCKER%" inspect "%CONTAINER%" >nul 2>nul
 if errorlevel 1 (
@@ -160,8 +165,14 @@ if errorlevel 1 (
 )
 exit /b 0
 
-:recreate_container
-call :check_docker_engine || exit /b 1
+:recreatecontainer
+"%DOCKER%" info >nul 2>nul
+if errorlevel 1 (
+  echo [ERROR] Docker engine is not running. Start Docker Desktop first.
+  exit /b 1
+)
+"%DOCKER%" rm -f "%CONTAINER%" >nul 2>nul
+ping -n 2 127.0.0.1 >nul
 "%DOCKER%" rm -f "%CONTAINER%" >nul 2>nul
 echo Recreating container %CONTAINER% with mount %MOUNT_DIR% ...
 "%DOCKER%" run -d --name "%CONTAINER%" -v "%MOUNT_DIR%:/input" "%IMAGE%" bash -lc "/root/startSql.bash; tail -f /dev/null" >nul
@@ -171,7 +182,7 @@ if errorlevel 1 (
 )
 exit /b 0
 
-:stop_container
+:stopcontainer
 "%DOCKER%" inspect -f "{{.State.Running}}" "%CONTAINER%" 2>nul | findstr /I /C:"true" >nul
 if not errorlevel 1 (
   "%DOCKER%" stop "%CONTAINER%" >nul
@@ -185,7 +196,7 @@ if not errorlevel 1 (
 )
 exit /b 0
 
-:print_status
+:printstatus
 echo.
 echo Docker:
 "%DOCKER%" version --format "  Client={{.Client.Version}}  Server={{.Server.Version}}" 2>nul
@@ -198,7 +209,7 @@ if errorlevel 1 echo   Container not found: %CONTAINER%
 echo.
 exit /b 0
 
-:run_mulval
+:runmulval
 set "RUN_INPUT_FILE=%~1"
 set "RUN_RULES_FILE=%~2"
 
@@ -219,7 +230,35 @@ if defined RUN_RULES_FILE (
   )
 )
 
-call :ensure_container || exit /b 1
+"%DOCKER%" info >nul 2>nul
+if errorlevel 1 (
+  echo [ERROR] Docker engine is not running. Start Docker Desktop first.
+  exit /b 1
+)
+
+echo Recreating container %CONTAINER% with mount %MOUNT_DIR% ...
+"%DOCKER%" rm -f "%CONTAINER%" >nul 2>nul
+ping -n 2 127.0.0.1 >nul
+"%DOCKER%" rm -f "%CONTAINER%" >nul 2>nul
+"%DOCKER%" run -d --name "%CONTAINER%" -v "%MOUNT_DIR%:/input" "%IMAGE%" bash -lc "/root/startSql.bash; tail -f /dev/null" >nul
+if errorlevel 1 (
+  echo [ERROR] Failed to recreate container for run.
+  exit /b 1
+)
+
+"%DOCKER%" exec "%CONTAINER%" bash -lc "test -f \"/input/%RUN_INPUT_FILE%\"" >nul 2>nul
+if errorlevel 1 (
+  echo [ERROR] Input file is not visible in container: /input/%RUN_INPUT_FILE%
+  exit /b 1
+)
+
+if defined RUN_RULES_FILE (
+  "%DOCKER%" exec "%CONTAINER%" bash -lc "test -f \"/input/%RUN_RULES_FILE%\"" >nul 2>nul
+  if errorlevel 1 (
+    echo [ERROR] Rules file is not visible in container: /input/%RUN_RULES_FILE%
+    exit /b 1
+  )
+)
 
 set "INNER_CMD=cd /input && graph_gen.sh -v"
 if defined RUN_RULES_FILE set "INNER_CMD=!INNER_CMD! -r \"%RUN_RULES_FILE%\""
@@ -245,13 +284,13 @@ echo   %MOUNT_DIR%
 echo   AttackGraph.pdf / AttackGraph.dot / AttackGraph.txt
 exit /b 0
 
-:normalize_mount_dir
+:normalizemount
 if "%MOUNT_DIR%"=="." set "MOUNT_DIR=%SCRIPT_DIR%"
 if "%MOUNT_DIR:~0,2%"==".\" set "MOUNT_DIR=%SCRIPT_DIR%\%MOUNT_DIR:~2%"
 if not "%MOUNT_DIR:~1,1%"==":" set "MOUNT_DIR=%SCRIPT_DIR%\%MOUNT_DIR%"
 exit /b 0
 
-:load_kv_file
+:loadkv
 set "KV_FILE=%~1"
 if not exist "%KV_FILE%" exit /b 0
 
@@ -268,7 +307,7 @@ for /f "usebackq eol=# tokens=1,* delims==" %%A in ("%KV_FILE%") do (
 )
 exit /b 0
 
-:init_env
+:initenv
 if exist "%ENV_FILE%" (
   echo .env already exists: %ENV_FILE%
   exit /b 0
@@ -277,15 +316,15 @@ copy /Y "%SCRIPT_DIR%\.env.example" "%ENV_FILE%" >nul
 echo Created .env from .env.example
 exit /b 0
 
-:init_legacy_config
+:initlegacyconfig
 if exist "%LEGACY_CONFIG_FILE%" (
   echo Config already exists: %LEGACY_CONFIG_FILE%
   exit /b 0
 )
 (
   echo # Legacy config for mulval-docker.bat
-  echo INPUT_FILE=sample-attack.P
-  echo # RULES_FILE=rules.P
+  echo INPUT_FILE=S2.P
+  echo RULES_FILE=rules5.P
 )> "%LEGACY_CONFIG_FILE%"
 echo Created legacy config: %LEGACY_CONFIG_FILE%
 exit /b 0

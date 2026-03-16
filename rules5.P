@@ -1,0 +1,446 @@
+
+
+/******************************************************/
+/****         Predicates Declaration              *****/
+/******************************************************/
+
+primitive(inCompetent(_user, _host, _perm)).
+primitive(hacl(_src, _dst, _prot, _port)).
+primitive(attackerLocated(_host)).
+primitive(networkServiceInfo(_host, _program, _protocol, _port, _user)).
+primitive(ttpExists(_machine,_vulID,_program,_range, _tech, _tactics)).
+primitive(ttpExists(_machine,_program,_range, _tech, _tactics)).
+primitive(nfsMount(_dst, _dstpath, _software, _perm, _sec)).
+primitive(leakAccount(_user, _host, _perm)).
+primitive(hasAccount(_host, _user, _passwd, _perm)).
+primitive(pathExists(_host, _path, _writable, _perm)).
+primitive(isDocker(_host, _docker)).
+primitive(weakAccount(_host, _user, _passwd, _perm)).
+primitive(isFirewall(_host, _state)).
+
+derived(execCode(_host, _user)).
+derived(netAccess(_machine,_protocol,_port)).
+derived(attackVectorInjection(_host, _user, _protocol, _port)).
+derived(getAccount(_host, _user, _passwd, _perm)).
+derived(disableFirewall(_host)).
+
+
+
+meta(dif(_,_)).
+meta(attackGoal(_)).
+meta(hasAccount(_,_,_,_)).
+
+
+
+/******************************************************/
+/****         Tabling Predicates                  *****/
+/*   All derived predicates should be tabled          */
+/******************************************************/
+
+:- table execCode/2.
+:- table disableFirewall/1.
+:- table netAccess/3.
+:- table canAccessHost/1.
+:- table canAccessFile/4.
+:- table accessFile/3.
+:- table principalCompromised/1.
+:- table logInService/3.
+:- table attackVectorInjection/4.
+:- table getAccount/4.
+
+
+/******************************************************/
+/****         Interaction Rules                   *****/
+/******************************************************/
+
+% 自定义 dif 谓词
+dif(X, Y) :-
+    X \= Y.
+
+/****** initial access ******/
+interaction_rule(
+  (attackVectorInjection(H, Perm, Protocol, Port) :-
+	attackerLocated(Zone),
+ 	inCompetent(User, H, Perm),
+	hacl(Zone, H, Protocol, Port)),
+  rule_desc('Insecure Operations Leading to Attack Vector Injection',
+  1.0)).
+
+
+interaction_rule(
+  (netAccess(H, Protocol, Port) :-
+	attackerLocated(Zone),
+	hacl(Zone, H, Protocol, Port)),
+  rule_desc('Direct Network Access',
+  1.0)).
+
+interaction_rule(
+  (execCode(H, Perm) :-
+	attackerLocated(Zone),
+	hacl(Zone, H, _, _),
+	leakAccount(_, H, Perm)),
+  rule_desc('Valid Accounts - T1078', 1.0)
+).
+
+interaction_rule(
+  (execCode(H, Perm) :-
+	attackerLocated(Zone),
+	hacl(Zone, H, _, _),
+	weakAccount(H, User, Passwd, Perm)),
+  rule_desc('Brute Force Password Spraying - T1110.003', 1.0)
+).
+
+interaction_rule(
+  (execCode(H, Perm) :-
+	ttpExists(H, _, Software, remoteExploit, publicApplicationExploit, initialAccess),
+	networkServiceInfo(H, Software, Protocol, Port, Perm),
+	netAccess(H, Protocol, Port)),
+  rule_desc('Exploit Public-Facing Application - T1190', 1.0)
+).
+
+/****** Credential Access ******/
+interaction_rule(
+  (getAccount(H, User, Passwd, Perm) :-
+	ttpExists(H, Software, _, lsassCredentialDumping, credentialAccess),
+	networkServiceInfo(H, Software, _, _, _),
+	hasAccount(H, User, Passwd, Perm),
+	execCode(H, admin)),
+  rule_desc('OS Credential Dumping LSASS Memory - T1003.001', 1.0)
+).
+
+interaction_rule(
+  (getAccount(H, User, Passwd, Perm) :-
+	ttpExists(H, Software, _, domainCredentialDumping, credentialAccess),
+	networkServiceInfo(H, Software, _, _, system),
+	hasAccount(H, User, Passwd, Perm),
+	execCode(H, system)),
+  rule_desc('OS Credential Dumping LSASS Memory - T1003.001', 1.0)
+).
+
+/***
+
+interaction_rule(
+  (execCode(H, Perm) :-
+	ttpExists(H, Protocol, _, 'T1110.003', credentialAccess),
+	hasAccount(H, _, _, Perm),
+	netAccess(H, Protocol, _)),
+  rule_desc('Brute Force Password Spraying - T1110.003', 1.0)
+).
+
+***/
+
+interaction_rule(
+  (execCode(HostD, Perm) :-
+	execCode(HostS, _),
+	weakAccount(HostD, _, _, Perm),
+	hacl(HostS, HostD, Protocol, Port),
+	dif(Port, 2049),
+	dif(Port, 873)),
+  rule_desc('Brute Force Password Spraying - T1110.003', 1.0)
+).
+
+
+/****** Execution ******/
+interaction_rule(
+  (execCode(H, Perm) :-
+	ttpExists(H, _, Software, _, clientVulnerability, execution),
+	networkServiceInfo(H, Software, Protocol, Port, Perm),
+	attackVectorInjection(H, _, Protocol, Port)),
+  rule_desc('Exploitation for Client Execution internet - T1203', 1.0)
+).
+
+
+/****** Impact ******/
+interaction_rule(
+  (execCode(H, Perm) :-
+	ttpExists(H, _, Software, remoteClient, ddosForExploit, impact),
+	networkServiceInfo(H, Software, Protocol, Port, Perm),
+	attackVectorInjection(H, _, Protocol, Port)),
+  rule_desc('DDOS-Application or System Exploitation - T1499.004', 1.0)
+).
+
+/****** Defense Evasion ******/
+interaction_rule(
+  (execCode(HostD, Perm) :-
+	execCode(HostS, Perm),
+	ttpExists(HostD, _, Software, remoteClient, networkBoundaryBridging, defenseEvasion),
+	networkServiceInfo(HostD, Software, Protocol, Port, Perm),
+	hacl(HostS, HostD, Protocol, Port)),
+  rule_desc('Network Boundary Bridging Network Address Translation Traversal - T1599.001', 1.0)
+).
+
+interaction_rule(
+  (execCode(HostD, Perm) :-
+	hacl(HostS, HostD, Protocol, Port),
+	ttpExists(HostD, Software, remoteClient, disguisedLegitimateDocument, defenseEvasion),
+	networkServiceInfo(HostD, Software, Protocol, Port, Perm),
+	netAccess(HostD, Protocol, Port)),
+  rule_desc('Masquerading - Match Legitimate Name or Location - T1036.005', 1.0)
+).
+
+interaction_rule(
+  (disableFirewall(HostD) :-
+	isFirewall(HostD, exit),
+	execCode(HostS, system),
+	ttpExists(HostD, Software, remoteClient, remoteDisableDefenses, defenseEvasion),
+	networkServiceInfo(HostD, Software, Protocol, Port, Perm),
+	hacl(HostS, HostD, Protocol, Port)),
+  rule_desc('Impair Defenses - Disable or Modify Tools - T1562.001', 1.0)
+).
+
+/***
+interaction_rule(
+  (execCode(HostD, Perm) :-
+	execCode(HostS, Perm),
+	ttpExists(HostD, _, Software, remoteClient, networkBoundaryBridging, defenseEvasion),
+	networkServiceInfo(HostD, Software, Protocol, Port, Perm),
+	hacl(HostS, HostD, Protocol, Port)),
+  rule_desc('Network Boundary Bridging Network Address Translation Traversal - T1599.001', 1.0)
+).
+***/
+
+interaction_rule(
+  (execCode(HostD, Perm) :-
+	attackVectorInjection(HostD, _, Protocol, Port),
+	ttpExists(HostD, _, Software, remoteClient, networkBoundaryBridging, defenseEvasion),
+	networkServiceInfo(HostD, Software, Protocol, Port, Perm)),
+  rule_desc('Network Boundary Bridging - Network Address Translation Traversal - T1599.001', 1.0)
+).
+
+/****** Privilege Escalation ******/
+interaction_rule(
+  (execCode(H, admin) :-
+	ttpExists(H, Software, local, processInjection, privilegeEscalation),
+	networkServiceInfo(H, Software, _, _, admin),
+	execCode(H, Perm),
+	dif(Perm, admin),
+	dif(Perm, root)),
+  rule_desc('Process Injection - T1055', 1.0)
+).
+
+interaction_rule(
+  (execCode(H, Perm1) :-
+	ttpExists(H, _, Software, local, privilegeEscalationExploit, privilegeEscalation),
+	networkServiceInfo(H, Software, _, _, Perm1),
+	execCode(H, Perm),
+	dif(Perm, admin),
+	dif(Perm, root)),
+  rule_desc('Exploitation for Privilege Escalation - T1068', 1.0)
+).
+
+
+interaction_rule(
+  (execCode(H, admin) :-
+	ttpExists(H, Software, local, scheduledTaskExploit, privilegeEscalation),
+	networkServiceInfo(H, Software, _, _, admin),
+	execCode(H, Perm),
+	dif(Perm, admin),
+	dif(Perm, root)),
+  rule_desc('Scheduled Task Job At - T1053.002', 1.0)
+).
+
+interaction_rule(
+  (execCode(H, system) :-
+	ttpExists(H, _, Software, local, publicApplicationExploit, privilegeEscalation),
+	networkServiceInfo(H, Software, _, _, system),
+	execCode(H, Perm),
+	dif(Perm, system)),
+  rule_desc('Exploit Public-Facing Application - T1190', 1.0)
+).
+
+interaction_rule(
+  (execCode(H, admin) :-
+	ttpExists(H, Software, local, pathHijack, privilegeEscalation),
+	pathExists(H, _, write, admin),
+	execCode(H, Perm),
+	dif(Perm, admin),
+	dif(Perm, root)),
+  rule_desc('Hijack Execution Flow Path Interception - T1574.007', 1.0)
+).
+
+interaction_rule(
+  (execCode(H, root) :-
+	ttpExists(H, Software, local, pathHijack, privilegeEscalation),
+	pathExists(H, _, write, root),
+	execCode(H, Perm),
+	dif(Perm, admin),
+	dif(Perm, root)),
+  rule_desc('Hijack Execution Flow Path Interception - T1574.007', 1.0)
+).
+
+interaction_rule(
+  (execCode(H, root) :-
+	execCode(Docker, root),
+	ttpExists(H, _ , local, escapetoHost, privilegeEscalation),
+	isDocker(H, Docker)),
+  rule_desc('Exploitation for Privilege Escalation - T1068', 1.0)
+).
+
+interaction_rule(
+  (execCode(HostD, Perm) :-
+	execCode(HostS, _),
+	networkServiceInfo(HostD, Software, Protocol, Port, Perm),
+	ttpExists(HostD, Software, remoteExploit, commandInterpreterExploit, execution),
+	hacl(HostS, HostD, Protocol, Port)),
+  rule_desc('Command and Scripting Interpreter - T1623', 1.0)
+).
+
+interaction_rule(
+  (execCode(HostD, Perm) :-
+	execCode(HostS, _),
+	networkServiceInfo(HostD, Software, Protocol, Port, Perm),
+	ttpExists(HostD, _, Software, _, clientVulnerability, execution),
+	hacl(HostS, HostD, Protocol, Port)),
+  rule_desc('Exploitation for Client Execution intranet - T1203', 1.0)
+).
+
+interaction_rule(
+  (execCode(HostD, Perm) :-
+	execCode(HostS, _),
+	networkServiceInfo(HostD, Software, Protocol, Port, Perm),
+	ttpExists(HostD, _, Software, _, abuseofVBScriptorVBA, execution),
+	hacl(HostS, HostD, Protocol, Port)),
+  rule_desc('Command and Scripting Interpreter - Visual Basic - T1059.005', 1.0)
+).
+
+interaction_rule(
+  (execCode(HostD, Perm) :-
+	attackVectorInjection(HostD, _, Protocol, Port),
+	networkServiceInfo(HostD, Software, Protocol, Port, Perm),
+	ttpExists(HostD, _, Software, _, abuseofVBScriptorVBA, execution)),
+  rule_desc('Command and Scripting Interpreter - Visual Basic - T1059.005', 1.0)
+).
+
+interaction_rule(
+  (execCode(HostD, Perm) :-
+	execCode(HostS, _),
+	networkServiceInfo(HostD, Software, Protocol, Port, Perm),
+	ttpExists(HostD, _, Software, _, browserSessionHijacking, collection),
+	hacl(HostS, HostD, Protocol, Port)),
+  rule_desc('Browser Session Hijacking - T1185', 1.0)
+).
+
+
+/****** Lateral Movement ******/
+interaction_rule(
+  (execCode(HOSTD, Perm) :-
+	networkServiceInfo(HOSTD, Software, Protocol, Port, Perm),
+    nfsMount(HOSTD, _, Software, write, HOSTS),
+	ttpExists(HOSTD, Software, _, linuxRemoteManagement, lateralMovement),
+    execCode(HOSTS, _),
+	hacl(HOSTS, HOSTD, Protocol, Port)),
+  rule_desc('Remote Services - SMB Windows Admin Shares - T1021.002', 1.0)
+).
+
+
+interaction_rule(
+  (execCode(HOSTD, Perm) :-
+	%ttpExists(HOSTD, winrm, _, windowsRemoteManagement, lateralMovement),
+	networkServiceInfo(HOSTD, winrm, Protocol, Port, _),
+	hacl(HOSTS, HOSTD, Protocol, Port),
+	execCode(HOSTS, system),
+	isFirewall(HOSTD, flase),
+	getAccount(_, User, Passwd, Perm),
+	hasAccount(HOSTD, User, Passwd, Perm)),
+	rule_desc('Remote Services - Windows Remote Management - T1021.006', 1.0)
+).
+
+interaction_rule(
+  (execCode(HOSTD, Perm) :-
+	%ttpExists(HOSTD, winrm, _, windowsRemoteManagement, lateralMovement),
+	networkServiceInfo(HOSTD, winrm, Protocol, Port, _),
+	hacl(HOSTS, HOSTD, Protocol, Port),
+	execCode(HOSTS, admin),
+	isFirewall(HOSTD, flase),
+	dif(HOSTD, pc_1),
+	getAccount(_, User, Passwd, Perm),
+	hasAccount(HOSTD, User, Passwd, Perm)),
+	rule_desc('Remote Services - Windows Remote Management - T1021.006', 1.0)
+).
+
+interaction_rule(
+  (execCode(HOSTD, Perm) :-
+	%ttpExists(HOSTD, winrm, _, windowsRemoteManagement, lateralMovement),
+	networkServiceInfo(HOSTD, winrm, Protocol, Port, _),
+	hacl(HOSTS, HOSTD, Protocol, Port),
+	execCode(HOSTS, system),
+	disableFirewall(HOSTD),
+	getAccount(_, User, Passwd, Perm),
+	hasAccount(HOSTD, User, Passwd, Perm)),
+	rule_desc('Remote Services - Windows Remote Management - T1021.006', 1.0)
+).
+
+interaction_rule(
+  (execCode(HOSTD, Perm) :-
+	%ttpExists(HOSTD, smb, _, hashAlternateAuthentication, lateralMovement),
+	networkServiceInfo(HOSTD, smb, Protocol, Port, _),
+	hacl(HOSTS, HOSTD, Protocol, Port),
+	execCode(HOSTS, admin),
+	getAccount(_, User, Passwd, _),
+	hasAccount(HOSTD, User, Passwd, Perm)),
+	rule_desc('Use Alternate Authentication Material - Pass the Hash - T1550.002', 1.0)
+).
+
+interaction_rule(
+  (execCode(HOSTD, Perm) :-
+	%ttpExists(HOSTD, rds, _, rdpHijacking, lateralMovement),
+	networkServiceInfo(HOSTD, rds, Protocol, Port, _),
+	hacl(HOSTS, HOSTD, Protocol, Port),
+	execCode(HOSTS, admin),
+	getAccount(_, User, Passwd, Perm),
+	hasAccount(HOSTD, User, Passwd, Perm)),
+	rule_desc('Remote Service Session RDP Hijacking - T1563.002', 1.0)
+).
+
+interaction_rule(
+  (execCode(HOSTD, Perm) :-
+	ttpExists(HOSTD, Software, _, remoteServicesExploitation, lateralMovement),
+	networkServiceInfo(HOSTD, Software, Protocol, Port, Perm),
+	hacl(HOSTS, HOSTD, Protocol, Port),
+	execCode(HOSTS, _)),
+	rule_desc('Exploitation of Remote Services - T1210', 1.0)
+).
+
+interaction_rule(
+  (execCode(HOSTD, Perm) :-
+	ttpExists(HOSTD, _, Software, _, remoteServicesExploitation, lateralMovement),
+	networkServiceInfo(HOSTD, Software, Protocol, Port, Perm),
+	hacl(HOSTS, HOSTD, Protocol, Port),
+	execCode(HOSTS, _)),
+	rule_desc('Exploitation of Remote Services - T1210', 1.0)
+).
+
+interaction_rule(
+  (execCode(HostD, Perm) :-
+	execCode(HostS, _),
+	networkServiceInfo(HostD, Software, Protocol, Port, Perm),
+	ttpExists(HostD, Software, remoteExploit, sshHijacking, lateralMovement),
+	hacl(HostS, HostD, Protocol, Port)),
+  rule_desc('Remote Service Session SSH Hijacking - T1563.001', 1.0)
+).
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
