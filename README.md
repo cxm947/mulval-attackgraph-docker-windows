@@ -5,8 +5,7 @@ Windows-friendly starter project for running MulVAL attack graph generation with
 ## Defaults (already set for your environment)
 
 - `MULVAL_MOUNT_DIR=F:\mulval-docker`
-- `INPUT_FILE=S2.P`
-- `RULES_FILE=rules5.P`
+- `DEFAULT_INPUT` and `DEFAULT_RULES` are in `mulval-docker.bat`
 
 ## Files
 
@@ -30,7 +29,7 @@ copy .env.example .env
 mulval-docker.bat
 ```
 
-This runs `graph_gen.sh -v -r rules5.P S2.P` and updates attack graph files in `F:\mulval-docker`.
+This runs with the current values of `DEFAULT_INPUT` and `DEFAULT_RULES` in `mulval-docker.bat`, and updates attack graph files in `F:\mulval-docker`.
 
 ## Common Commands
 
@@ -56,9 +55,9 @@ docker compose down
 
 ## Why DEFAULT_* may look ineffective
 
-`mulval-docker.bat` loads `.env` first. If `.env` has `INPUT_FILE` or `RULES_FILE`, those values override script defaults.
-
-If you change defaults in the BAT file, also update `.env` (or remove those keys in `.env`).
+Now `.env` only controls container/image/mount path.
+`INPUT_FILE` and `RULES_FILE` in `.env` are ignored by design.
+So changing `set "DEFAULT_INPUT=..."` or `set "DEFAULT_RULES=..."` in `mulval-docker.bat` takes effect directly.
 
 ## Mount Path Changes
 

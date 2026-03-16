@@ -301,8 +301,6 @@ for /f "usebackq eol=# tokens=1,* delims==" %%A in ("%KV_FILE%") do (
     if /I "!KEY!"=="MULVAL_CONTAINER" if not "!VAL!"=="" set "CONTAINER=!VAL!"
     if /I "!KEY!"=="MULVAL_IMAGE" if not "!VAL!"=="" set "IMAGE=!VAL!"
     if /I "!KEY!"=="MULVAL_MOUNT_DIR" if not "!VAL!"=="" set "MOUNT_DIR=!VAL!"
-    if /I "!KEY!"=="INPUT_FILE" if not "!VAL!"=="" set "INPUT_FILE=!VAL!"
-    if /I "!KEY!"=="RULES_FILE" set "RULES_FILE=!VAL!"
   )
 )
 exit /b 0
