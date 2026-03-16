@@ -1,0 +1,22 @@
+# local config
+.env
+mulval.config
+
+# MulVAL outputs
+AttackGraph.*
+ARCS.CSV
+VERTICES.CSV
+trace_output.P
+running_rules.P
+translated_rules.P
+environment.P
+environment.xwam
+run.P
+run.xwam
+xsb_log.txt
+dynamic_decl.gen
+metric.P
+
+# system files
+Thumbs.db
+.DS_Store

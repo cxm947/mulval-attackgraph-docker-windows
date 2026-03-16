@@ -1,0 +1,10 @@
+services:
+  mulval:
+    image: ${MULVAL_IMAGE:-wilbercui/mulval}
+    container_name: ${MULVAL_CONTAINER:-mulval-attackgraph}
+    working_dir: /input
+    volumes:
+      - ${MULVAL_MOUNT_DIR:-.}:/input
+    command: bash -lc "/root/startSql.bash; tail -f /dev/null"
+    stdin_open: true
+    tty: true
